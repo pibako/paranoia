@@ -31,7 +31,12 @@ module Paranoia
       if paranoia_sentinel_value.nil?
         with_deleted.where("#{self.table_name}.#{paranoia_column} IS NOT NULL")
       else
-        with_deleted.where("#{self.table_name}.#{paranoia_column} != '#{paranoia_sentinel_value}'")
+        sentinel_value_db = if paranoia_sentinel_value.is_a?(DateTime)
+                              paranoia_sentinel_value.to_formatted_s(:db)
+                            else
+                              paranoia_sentinel_value
+                            end
+        with_deleted.where("#{self.table_name}.#{paranoia_column} != '#{sentinel_value_db}'")
       end
     end
     alias :deleted :only_deleted
