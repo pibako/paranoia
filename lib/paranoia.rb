@@ -1,6 +1,17 @@
 require 'active_record' unless defined? ActiveRecord
 
 module Paranoia
+  @@default_sentinel_value = nil
+
+  # Change default_sentinel_value in a rails initilizer
+  def self.default_sentinel_value=(val)
+    @@default_sentinel_value = val
+  end
+
+  def self.default_sentinel_value
+    @@default_sentinel_value
+  end
+
   def self.included(klazz)
     klazz.extend Query
     klazz.extend Callbacks
@@ -17,7 +28,11 @@ module Paranoia
     end
 
     def only_deleted
-      with_deleted.where("#{self.table_name}.#{paranoia_column} IS NOT NULL")
+      if paranoia_sentinel_value.nil?
+        with_deleted.where("#{self.table_name}.#{paranoia_column} IS NOT NULL")
+      else
+        with_deleted.where("#{self.table_name}.#{paranoia_column} != '#{paranoia_sentinel_value}'")
+      end
     end
     alias :deleted :only_deleted
 
@@ -61,7 +76,7 @@ module Paranoia
   def restore!(opts = {})
     ActiveRecord::Base.transaction do
       run_callbacks(:restore) do
-        update_column paranoia_column, nil
+        update_column paranoia_column, paranoia_sentinel_value
         restore_associated_records if opts[:recursive]
       end
     end
@@ -69,7 +84,7 @@ module Paranoia
   alias :restore :restore!
 
   def destroyed?
-    !!send(paranoia_column)
+    send(paranoia_column) != paranoia_sentinel_value
   end
 
   alias :deleted? :destroyed?
@@ -137,10 +152,12 @@ class ActiveRecord::Base
     end
 
     include Paranoia
-    class_attribute :paranoia_column
+    class_attribute :paranoia_column, :paranoia_sentinel_value
 
     self.paranoia_column = options[:column] || :deleted_at
-    default_scope { where(self.quoted_table_name + ".#{paranoia_column} IS NULL") }
+
+    self.paranoia_sentinel_value = options.fetch(:sentinel_value) { Paranoia.default_sentinel_value }
+    default_scope { where(paranoia_column => paranoia_sentinel_value) }
 
     before_restore {
       self.class.notify_observers(:before_restore, self) if self.class.respond_to?(:notify_observers)
@@ -169,6 +186,10 @@ class ActiveRecord::Base
 
   def paranoia_column
     self.class.paranoia_column
+  end
+
+  def paranoia_sentinel_value
+    self.class.paranoia_sentinel_value
   end
 end
 

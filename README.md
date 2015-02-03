@@ -6,7 +6,7 @@ You would use either plugin / gem if you wished that when you called `destroy` o
 
 If you wish to actually destroy an object you may call `really_destroy!`. **WARNING**: This will also *really destroy* all `dependent: destroy` records, so please aim this method away from face when using.**
 
-If a record has `has_many` associations defined AND those associations have `dependent: :destroy` set on them, then they will also be soft-deleted if ``acts_as_paranoid`` is set,  otherwise the normal destroy will be called. 
+If a record has `has_many` associations defined AND those associations have `dependent: :destroy` set on them, then they will also be soft-deleted if ``acts_as_paranoid`` is set,  otherwise the normal destroy will be called.
 
 ## Installation & Usage
 
@@ -172,6 +172,31 @@ You can replace the older acts_as_paranoid methods as follows:
 |`find_with_deleted(:all)`   | `Client.with_deleted`          |
 |`find_with_deleted(:first)` | `Client.with_deleted.first`    |
 |`find_with_deleted(id)`     | `Client.with_deleted.find(id)` |
+
+
+The `recover` method in `acts_as_paranoid` runs `update` callbacks.  Paranoia's
+`restore` method does not do this.
+
+## Support for Unique Keys with Null Values
+
+Most databases ignore null columns when it comes to resolving unique index
+constraints.  This means unique constraints that involve nullable columns may be
+problematic. Instead of using `NULL` to represent a not-deleted row, you can pick
+a value that you want paranoia to mean not deleted. Note that you can/should
+now apply a `NOT NULL` constraint to your `deleted_at` column.
+
+Per model:
+
+```ruby
+# pick some value
+acts_as_paranoid sentinel_value: DateTime.new(0)
+```
+
+or globally in a rails initializer, e.g. `config/initializer/paranoia.rb`
+
+```ruby
+Paranoia.default_sentinel_value = DateTime.new(0)
+```
 
 ## License
 
